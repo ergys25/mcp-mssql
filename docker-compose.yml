@@ -1,40 +1,40 @@
 version: '3.8'
 
 services:
-  mssql-mcp:
+  mssql-mcp-server:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: mssql-mcp
+    container_name: mssql-mcp-server
     restart: unless-stopped
     stdin_open: true
     tty: true
     environment:
       - MSSQL_CONNECTION_STRING=Server=178.18.252.174,1433;Database=optimax;User Id=ergys;Password=36533653;TrustServerCertificate=true;Encrypt=true;
       - DOTNET_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8585
+      - MCP_TRANSPORT=sse
+    expose:
+      - "8585"
     networks:
-      - mcp-network
+      - navitrak-backend
     healthcheck:
       test: ["CMD", "dotnet", "--info"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
-    # Optional: if you need to expose HTTP endpoints in the future
-    # ports:
-    #   - "8080:8080"
-    # Optional: persist logs
     volumes:
       - ./logs:/app/logs
-    # Resource limits
     deploy:
       resources:
         limits:
           memory: 512M
         reservations:
           memory: 256M
+    labels:
+      - traefik.enable=false
 
 networks:
-  mcp-network:
-    driver: bridge
-    name: mcp-network
+  navitrak-backend:
+    external: true

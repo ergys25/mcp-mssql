@@ -35,10 +35,10 @@ USER appuser
 
 # Set environment variables
 ENV DOTNET_RUNNING_IN_CONTAINER=true
-ENV ASPNETCORE_URLS=http://+:8080
+ENV ASPNETCORE_URLS=http://+:8585
 
-# Expose port (if needed for future HTTP endpoints)
-EXPOSE 8080
+# Expose port for HTTP/SSE endpoint
+EXPOSE 8585
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \

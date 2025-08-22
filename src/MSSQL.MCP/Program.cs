@@ -1,13 +1,20 @@
 ﻿using Akka.Hosting;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using MSSQL.MCP.Configuration;
 using MSSQL.MCP.Database;
 using MSSQL.MCP.Actors;
 
-var hostBuilder = new HostBuilder();
+var hostBuilder = Host.CreateDefaultBuilder(args);
 
 hostBuilder
+    .ConfigureWebHostDefaults(webBuilder =>
+    {
+        webBuilder.UseKestrel()
+            .UseUrls(Environment.GetEnvironmentVariable("ASPNETCORE_URLS") ?? "http://+:8585");
+    })
     .ConfigureAppConfiguration((context, builder) =>
     {
         builder.AddEnvironmentVariables();
@@ -36,10 +43,32 @@ hostBuilder
     // Register SQL Connection Factory
     services.AddSingleton<ISqlConnectionFactory, SqlConnectionFactory>();
 
-    // Add MCP Server
-    services.AddMcpServer()
-        .WithStdioServerTransport()
-        .WithToolsFromAssembly();
+    // Add web services for SSE
+    services.AddControllers();
+    services.AddCors(options =>
+    {
+        options.AddDefaultPolicy(builder =>
+        {
+            builder.AllowAnyOrigin()
+                   .AllowAnyMethod()
+                   .AllowAnyHeader();
+        });
+    });
+
+    // Add MCP Server with SSE transport
+    var transport = Environment.GetEnvironmentVariable("MCP_TRANSPORT");
+    if (transport == "sse")
+    {
+        services.AddMcpServer()
+            .WithHttpServerTransport("/")
+            .WithToolsFromAssembly();
+    }
+    else
+    {
+        services.AddMcpServer()
+            .WithStdioServerTransport()
+            .WithToolsFromAssembly();
+    }
 
     // Add Akka.NET
     services.AddAkka("MSSQLMcpActorSystem", (builder, sp) =>
@@ -62,6 +91,16 @@ hostBuilder
     });
 });
 
-var host = hostBuilder.Build();
+var app = hostBuilder.Build();
 
-await host.RunAsync();
+// Configure the HTTP request pipeline
+if (app is WebApplication webApp)
+{
+    webApp.UseCors();
+    webApp.UseRouting();
+    
+    webApp.MapControllers();
+    webApp.MapGet("/health", () => "OK");
+}
+
+await app.RunAsync();
